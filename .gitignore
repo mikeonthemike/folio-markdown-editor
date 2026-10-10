@@ -1,0 +1,18 @@
+node_modules/
+.sites-runtime/
+*.tar.gz
+.wrangler/
+
+# Local hosting identity, credentials, and diagnostics
+.openai/
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+.npmrc
+*.pem
+*.key
+*.p12
+*.pfx
+*.log
