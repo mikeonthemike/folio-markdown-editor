@@ -24,3 +24,7 @@ Documents autosave in the current browser and are not synced between devices.
 The `assets.directory` setting points to `dist`, the complete static editor. No server, database, or environment variables are required. Documents remain in each visitor's browser or chosen local files. Browser storage is separate for localhost and the deployed URL: export and import to move drafts.
 
 Run file-saving regression checks with `node --test test/file-saving.test.cjs`.
+
+## License
+
+Folio is licensed under the [MIT License](LICENSE). Its bundled third-party libraries retain their own licenses.
