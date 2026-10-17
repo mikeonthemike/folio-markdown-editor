@@ -23,7 +23,9 @@ Documents autosave in the current browser and are not synced between devices.
 
 The `assets.directory` setting points to `dist`, the complete static editor. No server, database, or environment variables are required. Documents remain in each visitor's browser or chosen local files. Browser storage is separate for localhost and the deployed URL: export and import to move drafts.
 
-Run file-saving regression checks with `node --test test/file-saving.test.cjs`.
+Run the regression checks with `npm test` (Node's built-in test runner, no dependencies).
+
+YAML front matter at the top of a document (between `---` lines) is kept in the editor exactly as written. The preview shows a one-line summary (title, status, channel, due) and renders only the body. Folio never re-serialises the YAML, so unknown keys, comments and ordering survive a save byte for byte.
 
 ## License
 
