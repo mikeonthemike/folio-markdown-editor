@@ -2,5 +2,16 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "folio-markdown-editor",
   "compatibility_date": "2026-09-20",
-  "assets": { "directory": "./dist" }
+  "main": "src/worker.js",
+  // Static files are served without invoking the Worker; only /api/* runs Worker code.
+  "assets": { "directory": "./dist", "binding": "ASSETS", "run_worker_first": ["/api/*"] },
+  // Not secrets. The Access team domain and application AUD are visible in the Access login redirect.
+  "vars": {
+    "GITHUB_OWNER": "mikeonthemike",
+    "GITHUB_REPO": "folio-drafts",
+    "GITHUB_BRANCH": "main",
+    "TEAM_DOMAIN": "https://progresspath.cloudflareaccess.com",
+    "POLICY_AUD": "0096b2e682ddb412e8a832cd9074e563c7eb61623d063c7c0091f289accb77a2"
+  }
+  // GITHUB_TOKEN is a secret, set with `npx wrangler secret put GITHUB_TOKEN`. Never commit it.
 }

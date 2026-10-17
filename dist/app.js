@@ -27,13 +27,14 @@ Use **bold** for the important bits, *italics* for a little emphasis, and \`inli
 
 Ready when you are.
 `;
-const files=FolioFiles.createFileSaving(window);
+const files=FolioFiles.createFileSaving(window),drafts=FolioDrafts.createDrafts(window);
+const state=doc=>doc.source?drafts.state(doc):files.state(doc);
 const key='folio.documents.v1';let docs=[],active,dirty=false,timer;
 try{const stored=JSON.parse(localStorage.getItem(key));if(Array.isArray(stored?.docs)&&stored.docs.every(d=>typeof d.id==='string'&&typeof d.name==='string'&&typeof d.text==='string')){docs=stored.docs;active=stored.active}}catch{}
 if(!docs.length)docs=[{id:crypto.randomUUID(),name:'Welcome.md',text:initial}];if(!docs.some(d=>d.id===active))active=docs[0].id;
 const current=()=>docs.find(d=>d.id===active);
 function notify(message){$('#toast').textContent=message;$('#toast').classList.add('visible');clearTimeout(timer);timer=setTimeout(()=>$('#toast').classList.remove('visible'),3000)}
-function persist(feedback=false){try{localStorage.setItem(key,JSON.stringify({docs,active}));dirty=false;$('#saved').textContent=files.state(current());if(feedback)notify('Saved in this browser')}catch{dirty=true;$('#saved').textContent='Not saved';notify('Browser storage is unavailable or full. Export your document to keep it.')}}
+function persist(feedback=false){try{localStorage.setItem(key,JSON.stringify({docs,active}));dirty=false;$('#saved').textContent=state(current());if(feedback)notify('Saved in this browser')}catch{dirty=true;$('#saved').textContent='Not saved';notify('Browser storage is unavailable or full. Export your document to keep it.')}}
 function list(){const nav=$('#documents');nav.replaceChildren();docs.forEach(d=>{const b=document.createElement('button');b.className=d.id===active?'selected':'';b.setAttribute('aria-current',d.id===active?'page':'false');const icon=document.createElement('span');icon.textContent='▤';const label=document.createElement('span');label.textContent=d.name;b.append(icon,label);b.onclick=()=>{active=d.id;render();persist()};nav.append(b)});$('#doc-count').textContent=docs.length}
 function preview(){const {frontMatter,body:text}=FolioFrontMatter.split($('#editor').value);$('#preview').innerHTML=DOMPurify.sanitize(marked.parse(text),{FORBID_TAGS:['style','iframe','form','input'],FORBID_ATTR:['style']});$('#preview').querySelectorAll('a').forEach(a=>{a.target='_blank';a.rel='noopener noreferrer'});$('#words').textContent=(text.trim()?text.trim().split(/\s+/).length:0)+' words';$('#chars').textContent=text.length.toLocaleString()+' characters';if(frontMatter)$('#preview').prepend(meta(FolioFrontMatter.fields(frontMatter)))}
 // Front matter stays in the editor exactly as written; the preview shows a one-line summary instead of rendering it.
@@ -54,7 +55,7 @@ async function saveFile(saveAs=false) {
   const doc=current();
   try {
     const pending=files.save(doc,saveAs);
-    if(!dirty)$('#saved').textContent=files.state(current());
+    if(!dirty)$('#saved').textContent=state(current());
     const result=await pending;
     if(result.status==='download'){download(doc);notify('Direct file saving is unavailable here. A copy was downloaded.');return}
     if(result.status!=='saved')return;
@@ -64,7 +65,7 @@ async function saveFile(saveAs=false) {
     notify(doc.text===result.text?'Saved to '+result.name:'File saved; newer edits still need saving.');
   } catch(error) {
     notify(error.name==='NotAllowedError'?'File permission was denied. Try Save As or Export.':'Could not save the file. Your draft is still open; try Save As or Export.');
-  } finally {if(!dirty)$('#saved').textContent=files.state(current())}
+  } finally {if(!dirty)$('#saved').textContent=state(current())}
 }
 $('#save').onclick=()=>saveFile();$('#save-as').onclick=()=>saveFile(true);
 $('#export').onclick=()=>download();
@@ -79,6 +80,18 @@ $('#import').onclick=async()=>{
   try {const handles=await files.open();let count=0;for(const handle of handles){try{await importFile(await handle.getFile(),handle);count++}catch(error){notify(error.message);return}}if(count)notify('Opened '+count+' document'+(count===1?'':'s'))}
   catch(error){if(error.name!=='AbortError'){notify('Direct opening is unavailable. Import a copy instead.');$('#file').click()}}
 };
+// Open a draft from the folio-drafts repo. An already-open draft is reused, so local edits are never overwritten.
+$('#open-draft').onclick=async()=>{
+  const dialog=$('#drafts-dialog'),ul=$('#drafts-list');ul.replaceChildren();
+  try{const posts=await drafts.list();if(!posts.length)ul.textContent='No drafts yet.';
+    posts.forEach(p=>{const li=document.createElement('li'),b=document.createElement('button');b.textContent=p.slug;b.onclick=()=>{dialog.close();openDraft(p.slug)};li.append(b);ul.append(li)});dialog.showModal()}
+  catch(error){notify(error.name==='DraftsUnavailable'?error.message:'Could not list drafts ('+error.message+').')}
+};
+async function openDraft(slug){
+  const existing=docs.find(d=>d.source?.slug===slug);if(existing){active=existing.id;render();persist();notify('Already open: '+slug);return}
+  try{const post=await drafts.open(slug),doc=create(slug+'.md',post.text);drafts.attach(doc,post);persist();notify('Opened draft '+slug)}
+  catch(error){notify(error.name==='DraftsUnavailable'?error.message:'Could not open '+slug+' ('+error.message+').')}
+}
 $('#file').onchange=async e=>{try{for(const file of e.target.files)await importFile(file);notify('Imported Markdown documents')}catch(error){notify(error.message)}finally{e.target.value=''}};
 document.querySelectorAll('[data-mode]').forEach(b=>{if(b.tagName==='BUTTON')b.onclick=()=>{document.querySelectorAll('.tabs button').forEach(t=>{t.classList.toggle('active',t===b);t.setAttribute('aria-pressed',String(t===b))});$('.panes').dataset.mode=b.dataset.mode}});
 // Block-level inserts start a new line when the cursor is mid-line, same as lists and quotes.

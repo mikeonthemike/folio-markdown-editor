@@ -1,0 +1,4 @@
+# Copy to .dev.vars for `npx wrangler dev` (gitignored). Never commit real values.
+GITHUB_TOKEN=github_pat_...
+# Skips the Access JWT check, but only for requests to localhost/127.0.0.1.
+SKIP_ACCESS_CHECK=true
