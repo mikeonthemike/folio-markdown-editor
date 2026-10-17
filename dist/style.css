@@ -4,3 +4,4 @@
 
 @media(max-width:700px){header{height:auto;min-height:90px;flex-wrap:wrap;gap:4px;padding:10px 16px}.filename{width:100%;justify-content:space-between}#title{width:65%}#saved{display:inline;font-size:11px}.actions{width:100%;justify-content:flex-end}.actions button{font-size:12px}.actions .primary span{margin-left:5px}}
 .front-matter{margin:0 0 1.2em;padding:6px 10px;border-radius:7px;background:#f3f4f8;color:#5b6278;font:13px/1.4 "IBM Plex Mono",monospace}
+#drafts-dialog{border:1px solid #e0e3eb;border-radius:10px;padding:18px;min-width:280px}#drafts-dialog::backdrop{background:#252c4333}#drafts-list{list-style:none;padding:0;margin:0 0 14px;max-height:50vh;overflow:auto}#drafts-list button{width:100%;text-align:left;margin-bottom:6px}
