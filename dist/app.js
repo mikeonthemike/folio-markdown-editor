@@ -51,8 +51,21 @@ function download(doc=current()) {
   document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
   notify('Download requested. Check your browser downloads.');
 }
+async function saveDraft(doc) {
+  try {
+    const pending=drafts.save(doc);$('#saved').textContent=state(doc);const result=await pending;
+    if(result.status==='saved')notify(doc.text===result.text?(result.overwrote?'Overwrote the newer version of ':'Committed ')+doc.source.slug:'Committed; newer edits still need saving.');
+    if(result.status==='reloaded'){
+      const copy={id:crypto.randomUUID(),name:doc.source.slug+' (my edits).md',text:result.mine};docs.splice(docs.indexOf(doc)+1,0,copy);
+      doc.text=result.latest.text;drafts.attach(doc,result.latest);if(active===doc.id)render();else list();
+      notify('Loaded the latest '+doc.source.slug+'. Your edits are in "'+copy.name+'".');
+    }
+    persist();
+  } catch(error) {notify(error.name==='DraftsUnavailable'?error.message:'Could not commit '+doc.source.slug+' ('+error.message+'). Your draft is still here.')}
+  finally {if(!dirty)$('#saved').textContent=state(current())}
+}
 async function saveFile(saveAs=false) {
-  const doc=current();
+  const doc=current();if(doc.source&&!saveAs)return saveDraft(doc);
   try {
     const pending=files.save(doc,saveAs);
     if(!dirty)$('#saved').textContent=state(current());
