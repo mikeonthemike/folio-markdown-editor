@@ -29,6 +29,7 @@ Wrangler needs Node.js 22 or later.
 
 "Open draft" lists and opens `posts/<slug>/index.md` files from a GitHub repo (by default `mikeonthemike/folio-drafts`; see `vars` in `wrangler.jsonc`). The Worker holds the GitHub token; the browser never sees it.
 
+- **Save** on an opened draft commits it to the repo (`Folio edit: <slug>`) on top of the version you opened. If the draft changed outside Folio since then, Folio asks first: OK replaces it with your document; Cancel loads the latest version and keeps your edits as a separate local copy. Save As still writes a local file.
 - Set the token as a secret: `npx wrangler secret put GITHUB_TOKEN`. Use a fine-grained token limited to the drafts repo (Contents: read and write).
 - `/api/*` requires a valid Cloudflare Access JWT (`Cf-Access-Jwt-Assertion`) for the application in `TEAM_DOMAIN` / `POLICY_AUD`, in addition to Access itself.
 - Local development: copy `.dev.vars.example` to `.dev.vars`, add a token, then `npx wrangler dev`. `SKIP_ACCESS_CHECK=true` is honoured only for `localhost` / `127.0.0.1` requests.
