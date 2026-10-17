@@ -1,1 +1,1 @@
-{"name":"folio-markdown","version":"1.0.3","private":true,"scripts":{"start":"node server.cjs","test":"node --test test/"},"dependencies":{"dompurify":"^3.4.15","marked":"^18.0.13"}}
+{"name":"folio-markdown","version":"1.0.3","private":true,"scripts":{"start":"node server.cjs","test":"node --test test/*.test.cjs"},"dependencies":{"dompurify":"^3.4.15","marked":"^18.0.13"}}
