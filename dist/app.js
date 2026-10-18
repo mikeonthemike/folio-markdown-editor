@@ -36,11 +36,40 @@ const current=()=>docs.find(d=>d.id===active);
 function notify(message){$('#toast').textContent=message;$('#toast').classList.add('visible');clearTimeout(timer);timer=setTimeout(()=>$('#toast').classList.remove('visible'),3000)}
 function persist(feedback=false){try{localStorage.setItem(key,JSON.stringify({docs,active}));dirty=false;$('#saved').textContent=state(current());if(feedback)notify('Saved in this browser')}catch{dirty=true;$('#saved').textContent='Not saved';notify('Browser storage is unavailable or full. Export your document to keep it.')}}
 function list(){const nav=$('#documents');nav.replaceChildren();docs.forEach(d=>{const b=document.createElement('button');b.className=d.id===active?'selected':'';b.setAttribute('aria-current',d.id===active?'page':'false');const icon=document.createElement('span');icon.textContent='▤';const label=document.createElement('span');label.textContent=d.name;b.append(icon,label);b.onclick=()=>{active=d.id;render();persist()};nav.append(b)});$('#doc-count').textContent=docs.length}
-function preview(){const {frontMatter,body:text}=FolioFrontMatter.split($('#editor').value);$('#preview').innerHTML=DOMPurify.sanitize(marked.parse(text),{FORBID_TAGS:['style','iframe','form','input'],FORBID_ATTR:['style']});$('#preview').querySelectorAll('a').forEach(a=>{a.target='_blank';a.rel='noopener noreferrer'});$('#words').textContent=(text.trim()?text.trim().split(/\s+/).length:0)+' words';$('#chars').textContent=text.length.toLocaleString()+' characters';if(frontMatter)$('#preview').prepend(meta(FolioFrontMatter.fields(frontMatter)))}
-// Front matter stays in the editor exactly as written; the preview shows a one-line summary instead of rendering it.
-function meta(f){const p=document.createElement('p');p.className='front-matter';p.textContent=['title','status','channel','due'].filter(k=>f[k]).map(k=>k==='title'?f[k]:k+': '+f[k]).join(' · ')||'Front matter';return p}
-function render(){$('#title').value=current().name;$('#editor').value=current().text;list();preview()}
-function update(){current().text=$('#editor').value;preview();persist()}
+function preview(){const text=$('#editor').value;$('#preview').innerHTML=DOMPurify.sanitize(marked.parse(text),{FORBID_TAGS:['style','iframe','form','input'],FORBID_ATTR:['style']});$('#preview').querySelectorAll('a').forEach(a=>{a.target='_blank';a.rel='noopener noreferrer'});$('#words').textContent=(text.trim()?text.trim().split(/\s+/).length:0)+' words';$('#chars').textContent=text.length.toLocaleString()+' characters';if(fmBlock)$('#preview').prepend(fmHeader())}
+// Front matter is split off once per render and kept as the exact original bytes (fmBlock). The editor shows
+// only the body; saving always stores fmBlock + body, so untouched YAML round-trips byte for byte.
+let fmBlock='',fmOpen=true,fmEditing=false;
+const FM_KNOWN=['title','subtitle','status','channel','due','version','updated','linear'];
+const el=(tag,cls,text)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(text!==undefined)e.textContent=text;return e};
+const pill=status=>{const p=el('span','fm-pill',status);p.dataset.status=status;return p};
+function fmSummary(){
+  const list=FolioFrontMatter.entries(fmBlock),known=new Map(list.filter(e=>FM_KNOWN.includes(e.key)).map(e=>[e.key,e])),dl=$('#fm-summary'),other=$('#fm-other');
+  dl.replaceChildren();FM_KNOWN.filter(k=>known.has(k)&&k!=='status').forEach(k=>{const e=known.get(k),dd=el('dd');dd.textContent=e.nested?'(nested)':e.value||'—';dl.append(el('dt',k==='title'||k==='subtitle'?'wide':'',k),dd)});
+  other.replaceChildren();const rest=list.filter(e=>!FM_KNOWN.includes(e.key));if(rest.length){other.append(el('span','fm-other-label','Other keys'));rest.forEach(e=>other.append(el('code','',e.nested||!e.value?e.key:e.key+': '+e.value)))}
+}
+function fmPanel(){
+  const panel=$('#fm-panel');panel.hidden=!fmBlock;if(!fmBlock){fmEditing=false;return}
+  const status=(FolioFrontMatter.fields(fmBlock).status||'');$('#fm-pill-slot').replaceChildren(...(status?[pill(status)]:[]));$('#fm-pill-slot').title='status';
+  panel.classList.toggle('collapsed',!fmOpen);$('#fm-toggle').setAttribute('aria-expanded',String(fmOpen));
+  $('#fm-edit').textContent=fmEditing?'Done':'Edit YAML';$('#fm-edit').setAttribute('aria-pressed',String(fmEditing));
+  $('#fm-yaml').hidden=!fmEditing;$('#fm-summary').hidden=$('#fm-other').hidden=fmEditing;
+  if(fmEditing&&document.activeElement!==$('#fm-yaml')){$('#fm-yaml').value=FolioFrontMatter.parts(fmBlock).yaml;$('#fm-yaml').classList.remove('invalid');$('#fm-error').textContent=''}
+  fmSummary();
+}
+function fmHeader(){
+  const f=FolioFrontMatter.fields(fmBlock),h=el('div','fm-header');
+  const top=el('div','fm-header-top');if(f.status)top.append(pill(f.status));top.append(el('span','fm-header-label','Front matter'));h.append(top);
+  if(f.title)h.append(el('p','fm-header-title',f.title));if(f.subtitle)h.append(el('p','fm-header-subtitle',f.subtitle));
+  const meta=['channel','due','version','updated','linear'].filter(k=>f[k]).map(k=>(k==='version'?'v':k+' ')+f[k]);if(meta.length)h.append(el('p','fm-header-meta',meta.join(' · ')));
+  return h
+}
+$('#fm-toggle').onclick=()=>{fmOpen=!fmOpen;fmPanel()};
+$('#fm-edit').onclick=()=>{fmEditing=!fmEditing;if(fmEditing)fmOpen=true;fmPanel();if(fmEditing)$('#fm-yaml').focus()};
+$('#fm-yaml').addEventListener('input',()=>{const next=FolioFrontMatter.withYaml(fmBlock,$('#fm-yaml').value);if(next===null){$('#fm-yaml').classList.add('invalid');$('#fm-error').textContent='A line containing only --- or ... would end the front matter early. Remove it to save.';return}
+  $('#fm-yaml').classList.remove('invalid');$('#fm-error').textContent='';fmBlock=next;current().text=FolioFrontMatter.join(fmBlock,$('#editor').value);fmPanel();preview();persist()});
+function render(){const {frontMatter,body}=FolioFrontMatter.split(current().text);fmBlock=frontMatter;fmEditing=false;$('#title').value=current().name;$('#editor').value=body;list();fmPanel();preview()}
+function update(){current().text=FolioFrontMatter.join(fmBlock,$('#editor').value);preview();persist()}
 function create(name='Untitled.md',text=''){const d={id:crypto.randomUUID(),name,text};docs.unshift(d);active=d.id;render();persist();$('#editor').focus();return d}
 $('#new').onclick=()=>{let i=1;while(docs.some(d=>d.name===`Untitled${i===1?'':' '+i}.md`))i++;create(`Untitled${i===1?'':' '+i}.md`)};
 $('#editor').addEventListener('input',update);
