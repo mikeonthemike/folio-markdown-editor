@@ -12,7 +12,11 @@
     "GITHUB_BRANCH": "main",
     "TEAM_DOMAIN": "https://progresspath.cloudflareaccess.com",
     "POLICY_AUD": "0096b2e682ddb412e8a832cd9074e563c7eb61623d063c7c0091f289accb77a2"
-  }
+  },
+  // Required by `wrangler preview` (Workers Builds runs it for non-production branches). Left empty on
+  // purpose: Previews don't inherit vars or secrets, so a Preview serves the editor but its /api refuses
+  // every request and can never read or commit drafts.
+  "previews": {},
   // GITHUB_TOKEN is a secret. Set it AFTER the first `npx wrangler deploy` of this script
   // (`npx wrangler secret put GITHUB_TOKEN` or the dashboard). Never commit it.
 }
