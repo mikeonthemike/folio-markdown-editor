@@ -19,11 +19,23 @@ Documents autosave in the current browser and are not synced between devices.
 1. Install the dependencies with `npm ci`.
 2. In `wrangler.jsonc`, set `name` to the name you want for your Worker. The included name is an example; use a different name if needed in your account.
 3. Authenticate with your own Cloudflare account using `npx wrangler login`.
-4. Run `npx wrangler deploy` from the project directory. Wrangler prints your deployment URL when it succeeds.
+4. Run `npx wrangler deploy` from the project directory (Node.js 22 or later). Wrangler prints your deployment URL when it succeeds.
+5. Only then, if you use the drafts repo, set the `GITHUB_TOKEN` secret (see below). Cloudflare can't attach variables or secrets to a Worker that is only static assets, so the Worker script has to be deployed first.
 
-The `assets.directory` setting points to `dist`, the complete static editor. No server, database, or environment variables are required. Documents remain in each visitor's browser or chosen local files. Browser storage is separate for localhost and the deployed URL: export and import to move drafts.
+The `assets.directory` setting points to `dist`, the complete static editor, served without invoking Worker code. Only `/api/*` runs the Worker in `src/worker.js`. Documents remain in each visitor's browser or chosen local files unless opened from the drafts repo. Browser storage is separate for localhost and the deployed URL: export and import to move drafts.
 
-Run the regression checks with `npm test` (Node's built-in test runner, no dependencies).
+Wrangler needs Node.js 22 or later.
+
+## Drafts repo (optional)
+
+"Open draft" lists and opens `posts/<slug>/index.md` files from a GitHub repo (by default `mikeonthemike/folio-drafts`; see `vars` in `wrangler.jsonc`). The Worker holds the GitHub token; the browser never sees it.
+
+- **Save** on an opened draft commits it to the repo (`Folio edit: <slug>`) on top of the version you opened. If the draft changed outside Folio since then, Folio asks first: OK replaces it with your document; Cancel loads the latest version and keeps your edits as a separate local copy. Save As still writes a local file.
+- **Order matters:** deploy first (`npx wrangler deploy`), *then* set the token. Use a fine-grained token limited to the drafts repo (Contents: read and write), set either with `npx wrangler secret put GITHUB_TOKEN` or in the dashboard: Workers & Pages → your Worker → Settings → Variables and Secrets → Add → type Secret, name `GITHUB_TOKEN` → Deploy. Until it is set, `/api/*` returns `500 {"error":"not_configured"}`; the editor itself works normally.
+- `/api/*` requires a valid Cloudflare Access JWT (`Cf-Access-Jwt-Assertion`) for the application in `TEAM_DOMAIN` / `POLICY_AUD`, in addition to Access itself.
+- Local development: copy `.dev.vars.example` to `.dev.vars`, add a token, then `npx wrangler dev`. `SKIP_ACCESS_CHECK=true` is honoured only for `localhost` / `127.0.0.1` requests.
+
+Run the regression checks with `npm test` (Node's built-in test runner).
 
 YAML front matter at the top of a document (between `---` lines) is kept in the editor exactly as written. The preview shows a one-line summary (title, status, channel, due) and renders only the body. Folio never re-serialises the YAML, so unknown keys, comments and ordering survive a save byte for byte.
 
