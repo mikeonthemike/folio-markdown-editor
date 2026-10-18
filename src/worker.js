@@ -5,6 +5,7 @@ import { createRemoteJWKSet, jwtVerify } from 'jose';
 const SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const POST = /^posts\/([a-z0-9]+(?:-[a-z0-9]+)*)\/index\.md$/;
 const jwks = new Map();
+const MAX_TEXT = 1024 * 1024;
 
 const json = (body, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store' } });
@@ -55,6 +56,30 @@ async function getPost(env, slug) {
   return json({ slug, path: file.path, sha: file.sha, text: decode(file.content) });
 }
 
+const encode = text => {
+  let bin = '';
+  for (const byte of new TextEncoder().encode(text)) bin += String.fromCharCode(byte);
+  return btoa(bin);
+};
+
+// Commit an edit on top of the version the editor opened. GitHub rejects a stale sha (409/422),
+// which is surfaced as a conflict so the editor can ask before overwriting.
+async function putPost(request, env, slug) {
+  if (!(request.headers.get('content-type') || '').startsWith('application/json')) return json({ error: 'unsupported_media_type' }, 415);
+  const input = await request.json().catch(() => null);
+  if (!input || typeof input.text !== 'string' || typeof input.sha !== 'string' || !/^[0-9a-f]{40}$/.test(input.sha)) return json({ error: 'bad_request' }, 400);
+  if (input.text.length > MAX_TEXT) return json({ error: 'too_large' }, 413);
+  const res = await github(env, `contents/posts/${slug}/index.md`, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ message: `Folio edit: ${slug}`, content: encode(input.text), sha: input.sha, branch: env.GITHUB_BRANCH }),
+  });
+  if (res.status === 409 || res.status === 422) return json({ error: 'conflict' }, 409);
+  if (!res.ok) return upstream(res);
+  const out = await res.json();
+  return json({ slug, sha: out.content.sha, commit: out.commit.sha });
+}
+
 function upstream(res) {
   if (res.status === 404) return json({ error: 'not_found' }, 404);
   return json({ error: 'upstream', status: res.status }, 502);
@@ -69,6 +94,7 @@ async function api(request, env) {
   if (!m) return json({ error: 'not_found' }, 404);
   if (!SLUG.test(m[1])) return json({ error: 'bad_slug' }, 400);
   if (request.method === 'GET') return getPost(env, m[1]);
+  if (request.method === 'PUT') return putPost(request, env, m[1]);
   return json({ error: 'method_not_allowed' }, 405);
 }
 
