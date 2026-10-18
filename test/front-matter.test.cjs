@@ -59,3 +59,46 @@ test('fields reads the known top-level scalars for display',()=>{
   assert.equal(f.tone,undefined,'nested keys are not top-level fields');
   assert.deepEqual(fields(''),{});
 });
+
+// The editor UI keeps the split-off block as-is and only ever rejoins it with the edited body,
+// or swaps the YAML inside it via withYaml. These tests follow that exact path.
+const {parts,withYaml,entries}=require('../dist/front-matter.js');
+const uiEdit = (text, editBody = b => b, editYaml) => {
+  let { frontMatter, body } = split(text);
+  if (editYaml) frontMatter = withYaml(frontMatter, editYaml(parts(frontMatter).yaml));
+  return join(frontMatter, editBody(body));
+};
+
+test('panel path: returns the example byte for byte when nothing is edited', () => {
+  assert.equal(uiEdit(example), example);
+});
+
+test('panel path: keeps the front matter bytes when only the body changes', () => {
+  const out = uiEdit(example, b => b + '\nNew line.\n');
+  assert.equal(split(out).frontMatter, split(example).frontMatter);
+  assert.ok(out.endsWith('\nNew line.\n'));
+});
+
+test('panel path: keeps the body and delimiters when only the YAML changes', () => {
+  const out = uiEdit(example, undefined, y => y.replace('status: draft', 'status: in-review'));
+  assert.equal(split(out).body, split(example).body);
+  assert.equal(out, example.replace('status: draft', 'status: in-review'));
+});
+
+test('panel path: preserves CRLF, BOM and a ... closer through a YAML edit', () => {
+  const text = '\uFEFF---\r\ntitle: A\r\n...\r\nBody\r\n';
+  assert.equal(uiEdit(text, undefined, y => y + 'status: final'), '\uFEFF---\r\ntitle: A\r\nstatus: final\r\n...\r\nBody\r\n');
+});
+
+test('panel path: refuses YAML that would close the block early', () => {
+  const { frontMatter } = split(example);
+  assert.equal(withYaml(frontMatter, 'title: A\n---\nstatus: draft\n'), null);
+  assert.equal(withYaml(frontMatter, 'title: A\n...\n'), null);
+});
+
+test('panel path: lists known and unknown keys, flagging nested values without parsing them', () => {
+  const list = entries(split(example).frontMatter);
+  assert.deepEqual(list.map(e => e.key), ['title', 'subtitle', 'linear', 'status', 'channel', 'due', 'version', 'updated', 'april_notes']);
+  assert.deepEqual(list.find(e => e.key === 'april_notes'), { key: 'april_notes', value: '', nested: true });
+  assert.equal(list.find(e => e.key === 'linear').value, '');
+});
