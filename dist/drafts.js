@@ -19,9 +19,11 @@
       async open(slug) { return call('/' + encodeURIComponent(slug)); },
       // Remember what was read so state and later saves know the base version.
       attach(doc, post) { doc.source = { slug: post.slug, sha: post.sha, text: post.text }; },
+      // Edits since the last save or load: source.text is the text GitHub held at that point.
+      dirty(doc) { return doc.text !== doc.source.text; },
       state(doc) {
         if (busy.has(doc.id)) return 'Committing…';
-        return doc.text === doc.source.text ? 'Saved to drafts' : 'Draft has unsaved changes';
+        return this.dirty(doc) ? 'Draft has unsaved changes' : 'Saved to drafts';
       },
       // Commit the document as it is now, on top of the sha it was opened at. If the draft changed
       // outside Folio, ask (same prompt as local files): OK overwrites, Cancel loads the latest version.
@@ -51,6 +53,13 @@
       },
     };
   }
-  root.FolioDrafts = { createDrafts };
+  // Reopening a draft that is already open: 'switch' if GitHub still has the version it was read at,
+  // 'load' if GitHub is newer and nothing local would be lost, 'ask' if GitHub is newer and there are local edits.
+  function reopenDecision(doc, latest) {
+    if (latest.sha === doc.source.sha) return 'switch';
+    if (doc.text === doc.source.text || doc.text === latest.text) return 'load';
+    return 'ask';
+  }
+  root.FolioDrafts = { createDrafts, reopenDecision };
   if (typeof module !== 'undefined') module.exports = root.FolioDrafts;
 })(typeof window === 'undefined' ? globalThis : window);
