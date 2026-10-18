@@ -10,16 +10,13 @@ test('reopen: GitHub unchanged just switches, even with local edits', () => {
   assert.equal(reopenDecision(draft('mine','a'),{sha:'s1',text:'a'}),'switch');
 });
 
-test('reopen: GitHub newer and no local edits loads the latest', () => {
-  assert.equal(reopenDecision(draft('a','a'),{sha:'s2',text:'b'}),'load');
+test('reopen: GitHub newer always prompts, with or without local edits', () => {
+  assert.equal(reopenDecision(draft('a','a'),{sha:'s2',text:'b'}),'prompt');
+  assert.equal(reopenDecision(draft('mine','a'),{sha:'s2',text:'b'}),'prompt');
 });
 
-test('reopen: GitHub newer with local edits asks', () => {
-  assert.equal(reopenDecision(draft('mine','a'),{sha:'s2',text:'b'}),'ask');
-});
-
-test('reopen: local edits identical to the latest load without asking', () => {
-  assert.equal(reopenDecision(draft('b','a'),{sha:'s2',text:'b'}),'load');
+test('reopen: GitHub newer but identical to the local text syncs without a prompt', () => {
+  assert.equal(reopenDecision(draft('b','a'),{sha:'s2',text:'b'}),'sync');
 });
 
 test('close: a clean GitHub draft closes without asking; a dirty one asks', () => {

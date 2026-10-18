@@ -54,11 +54,12 @@
     };
   }
   // Reopening a draft that is already open: 'switch' if GitHub still has the version it was read at,
-  // 'load' if GitHub is newer and nothing local would be lost, 'ask' if GitHub is newer and there are local edits.
+  // 'sync' if GitHub moved but holds exactly the local text (adopt its sha, nothing to show), otherwise
+  // 'prompt': GitHub is newer and the user chooses (load, review the diff, or keep editing).
   function reopenDecision(doc, latest) {
     if (latest.sha === doc.source.sha) return 'switch';
-    if (doc.text === doc.source.text || doc.text === latest.text) return 'load';
-    return 'ask';
+    if (doc.text === latest.text) return 'sync';
+    return 'prompt';
   }
   root.FolioDrafts = { createDrafts, reopenDecision };
   if (typeof module !== 'undefined') module.exports = root.FolioDrafts;

@@ -138,13 +138,23 @@ $('#import').onclick=async()=>{
   catch(error){if(error.name!=='AbortError'){notify('Direct opening is unavailable. Import a copy instead.');$('#file').click()}}
 };
 // Open a draft from the folio-drafts repo. An already-open draft is checked against GitHub: unchanged, it is
-// just selected; newer and clean, it is refreshed; newer with local edits, the user chooses (edits are never lost).
+// just selected; if GitHub is newer the user always chooses (load, review the diff, or keep editing).
 $('#open-draft').onclick=async()=>{
   const dialog=$('#drafts-dialog'),ul=$('#drafts-list');ul.replaceChildren();
   try{const posts=await drafts.list();if(!posts.length)ul.textContent='No drafts yet.';
     posts.forEach(p=>{const li=document.createElement('li'),b=document.createElement('button');b.textContent=p.slug;b.onclick=()=>{dialog.close();openDraft(p.slug)};li.append(b);ul.append(li)});dialog.showModal()}
   catch(error){notify(error.name==='DraftsUnavailable'?error.message:'Could not list drafts ('+error.message+').')}
 };
+function choose(dialog){return new Promise(resolve=>{dialog.returnValue='';dialog.addEventListener('close',()=>resolve(dialog.returnValue),{once:true});dialog.showModal()})}
+function showDiff(mine,theirs){
+  const view=$('#diff-view');view.replaceChildren();
+  FolioDiff.review(mine,theirs).forEach(row=>{
+    if(row.type==='skip'){view.append(el('div','diff-skip','⋯ '+row.count+' unchanged line'+(row.count===1?'':'s')));return}
+    const line=el('div','diff-row '+row.type),text=el('span','diff-text');line.append(el('span','diff-sign',row.type==='del'?'−':row.type==='add'?'+':''),text);
+    if(row.parts)row.parts.forEach(p=>text.append(p.type==='same'?document.createTextNode(p.text):el('mark','',p.text)));else text.textContent=row.text;
+    view.append(line)});
+}
+function useLatest(doc,latest){doc.text=latest.text;drafts.attach(doc,latest);render();notify('Loaded the latest '+doc.source.slug+' from GitHub.')}
 async function openDraft(slug){
   const existing=docs.find(d=>d.source?.slug===slug);let post;
   try{post=await drafts.open(slug)}
@@ -152,12 +162,16 @@ async function openDraft(slug){
     if(existing){active=existing.id;render();persist();notify('Could not check GitHub for a newer '+slug+'; showing your local copy.');return}
     notify(error.name==='DraftsUnavailable'?error.message:'Could not open '+slug+' ('+error.message+').');return}
   if(!existing){const doc=create(slug+'.md',post.text);drafts.attach(doc,post);persist();notify('Opened draft '+slug);return}
-  active=existing.id;const decision=FolioDrafts.reopenDecision(existing,post);
-  if(decision==='switch'){render();persist();notify(slug+' is already open and up to date.');return}
-  if(decision==='load'){existing.text=post.text;drafts.attach(existing,post);render();persist();notify('Updated '+slug+' from GitHub.');return}
-  render();
-  if(confirm('GitHub has a newer version of '+slug+', and you have unsaved edits.\n\nOK: Load latest (your edits kept as a copy)\nCancel: Keep editing mine'))loadLatestKeepingCopy(existing,existing.text,post);
-  else notify('Kept your edits. Saving will ask before replacing the newer version on GitHub.');
+  active=existing.id;render();persist();const decision=FolioDrafts.reopenDecision(existing,post);
+  if(decision==='switch'){notify(slug+' is already open and up to date.');return}
+  if(decision==='sync'){drafts.attach(existing,post);persist();notify(slug+' already matches the latest version on GitHub.');return}
+  const edits=drafts.dirty(existing);
+  $('#refresh-text').textContent=edits?'You have unsaved edits to '+slug+'. Load latest keeps them as a separate copy.':'Your copy of '+slug+' has no unsaved edits.';
+  let choice=await choose($('#refresh-dialog'));
+  if(choice==='review'){$('#diff-title').textContent='Changes in '+slug;showDiff(existing.text,post.text);choice=await choose($('#diff-dialog'))}
+  if(choice==='load'&&edits||choice==='both')loadLatestKeepingCopy(existing,existing.text,post);
+  else if(choice==='load'||choice==='theirs')useLatest(existing,post);
+  else notify('Kept your copy. Saving will ask before replacing the newer version on GitHub.');
   persist();
 }
 $('#file').onchange=async e=>{try{for(const file of e.target.files)await importFile(file);notify('Imported Markdown documents')}catch(error){notify(error.message)}finally{e.target.value=''}};
