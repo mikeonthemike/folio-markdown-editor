@@ -13,5 +13,6 @@
     "TEAM_DOMAIN": "https://progresspath.cloudflareaccess.com",
     "POLICY_AUD": "0096b2e682ddb412e8a832cd9074e563c7eb61623d063c7c0091f289accb77a2"
   }
-  // GITHUB_TOKEN is a secret, set with `npx wrangler secret put GITHUB_TOKEN`. Never commit it.
+  // GITHUB_TOKEN is a secret. Set it AFTER the first `npx wrangler deploy` of this script
+  // (`npx wrangler secret put GITHUB_TOKEN` or the dashboard). Never commit it.
 }
